@@ -1,0 +1,51 @@
+name: DAST with OWASP ZAP
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # nécessaire pour pousser le rapport sur gh-pages
+
+jobs:
+  dast:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t library/flask-app .
+
+      - name: Run Flask app
+        run: |
+          docker run -d --name flask-app -p 5001:5001 library/flask-app
+          for i in $(seq 1 15); do
+            curl -s http://localhost:5001 && break || sleep 2
+          done
+
+      - name: Run OWASP ZAP full scan
+        run: |
+          mkdir -p zap-out && chmod 777 zap-out
+          docker run --rm --network host \
+            -v ${{ github.workspace }}/zap-out:/zap/wrk:rw \
+            zaproxy/zap-stable zap-full-scan.py \
+            -t http://localhost:5001 \
+            -r report.html -J report.json -I
+
+      - name: Upload report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: zap-out/
+
+      - name: Publish report to GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./zap-out
+          destination_dir: zap-report
