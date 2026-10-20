@@ -1,9 +1,7 @@
 import re
-from flask import Flask, request, abort
-from markupsafe import escape
+from flask import Flask, request, abort, render_template_string
 from werkzeug.serving import WSGIRequestHandler
 
-# Masque la version dans l'en-tête "Server"
 WSGIRequestHandler.version_string = lambda self: "webserver"
 
 app = Flask(__name__)
@@ -13,7 +11,11 @@ NAME_PATTERN = re.compile(r"^[\w\s\-]{1,100}$")
 
 PAGE = (
     "<!doctype html><html lang='fr'><head><meta charset='utf-8'>"
-    "<title>{title}</title></head><body>{body}</body></html>"
+    "<title>{{ title }}</title></head><body>{{ body | safe }}</body></html>"
+)
+HELLO_PAGE = (
+    "<!doctype html><html lang='fr'><head><meta charset='utf-8'>"
+    "<title>Hello</title></head><body><h1>Hello {{ name }}</h1></body></html>"
 )
 
 
@@ -37,7 +39,8 @@ def security_headers(response):
 
 @app.route("/", methods=["GET"])
 def index():
-    return PAGE.format(
+    return render_template_string(
+        PAGE,
         title="Flask DAST demo",
         body="<h1>Flask DAST demo</h1><a href='/hello?name=test'>hello</a>",
     )
@@ -48,7 +51,7 @@ def hello():
     name = request.args.get("name", "world")
     if not NAME_PATTERN.match(name):
         abort(400)
-    return PAGE.format(title="Hello", body=f"<h1>Hello {escape(name)}</h1>")
+    return render_template_string(HELLO_PAGE, name=name)
 
 
 @app.errorhandler(400)
@@ -56,7 +59,9 @@ def hello():
 @app.errorhandler(405)
 @app.errorhandler(413)
 def handle_error(e):
-    return PAGE.format(title="Erreur", body="<p>Requête invalide.</p>"), e.code
+    return render_template_string(
+        PAGE, title="Erreur", body="<p>Requête invalide.</p>"
+    ), e.code
 
 
 if __name__ == "__main__":
