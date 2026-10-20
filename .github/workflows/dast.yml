@@ -39,8 +39,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: zap-report
-          path: zap-out/
+          name: zap-report-apres
+          path: zap-after/
 
       - name: Publish report to GitHub Pages
         if: always()
